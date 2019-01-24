@@ -25,23 +25,22 @@ import bs4
 from bs4 import BeautifulSoup as soup
 import requests
 
-hosturl 	= "35.197.135.249"
+hosturl 	= "34.73.255.82"
 dbuser 		= "root"
 dbpassoword = "password"
-dbname 		= "modelStockprediction"
+dbname 		= "yahoo_finance"
 
-stock_table_name = ['tbl_align', 'tbl_poly', 'tbl_aal', 'tbl_ibm', 'tbl_rrs']
-stockNames = ['ALGN', 'POLY', 'AAL', 'IBM', 'RRS']
+# stock_table_name = ['tbl_align', 'tbl_poly', 'tbl_aal', 'tbl_ibm', 'tbl_rrs']
+# stockNames = ['ALGN', 'POLY', 'AAL', 'IBM', 'RRS']
 
-prev_market_type = ['OPEN', 'OPEN', 'OPEN', 'OPEN', 'OPEN']
+stock_table_name = ['tbl_ibm', 'tbl_rrs']
+stockNames = ['IBM', 'RRS']
 
-tradingview_url = 'https://www.tradingview.com/symbols/'
-stock_url = ['NASDAQ-ALGN', 'LSE-POLY', 'LSE-AAL', 'SIX-IBM', 'TSXV-RRS']
+finance_url = 'https://finance.yahoo.com/quote/'
+# stock_url = ['ALGN/history?period1=980784000&period2=1548259200&interval=1d&filter=history&frequency=1d', 'POLY.L/history?period1=1319731200&period2=1548259200&interval=1d&filter=history&frequency=1d', 'AAL.L/history?period1=927475200&period2=1548259200&interval=1d&filter=history&frequency=1d', 'IBM/history?period1=-252403200&period2=1548259200&interval=1d&filter=history&frequency=1d', 'RRS.V/history?period1=839433600&period2=1548259200&interval=1d&filter=history&frequency=1d']
 
-tv_url='https://www.marketwatch.com/investing/stock/'
-stockUrl = ['algn', 'poly?countrycode=uk', 'aal?countrycode=uk', 'ibm', 'rrs?countrycode=ca']
+stock_url = ['IBM/history?period1=-252403200&period2=1548259200&interval=1d&filter=history&frequency=1d', 'RRS.V/history?period1=839433600&period2=1548259200&interval=1d&filter=history&frequency=1d']
 
-# prev_market_type = ['OPEN', 'OPEN'. 'OPEN', 'OPEN', 'OPEN']
 
 path_to_chromedriver = '/usr/bin/chromedriver'
 
@@ -62,7 +61,7 @@ options.add_argument("--no-sandbox")
 options.add_argument("--disable-extensions")
 options.add_argument("--dns-prefetch-disable")
 
-def StockDataToSql(data1, data2, data3):
+def StockDataToSql(data):
     try:
         mydb = mysql.connector.connect(
               host      = hosturl,
@@ -72,328 +71,97 @@ def StockDataToSql(data1, data2, data3):
         )
         mycursor = mydb.cursor()
 
-        for i in range(5):
+        for i in range(2):                
+                for j in range(len(data[i])):
+                    datastr = ""
+                    for k in range(7):                                    
+                        datastr = datastr + "'" + data[i][j][k] + "'" + ","
 
-            # sql = "DELETE FROM " + stock_table_name[i] + " WHERE 1=1"
-            # mycursor.execute(sql)
-            # mydb.commit()
+                    datastr = datastr + "'" + data[i][j][7] + "'"
+                    datastr = "(" + datastr + ")"
+                        
+                    sql = "INSERT INTO " + stock_table_name[i] + " (symbolName, Date, Open, High, Low, Close, AdjClose, Volume) VALUES " + datastr
 
-            # if((prev_market_type[i].upper() == 'OPEN' and data1[i][1].upper() == 'OPEN') or (prev_market_type[i].upper() != data1[i][1].upper())):
-            prev_market_type[i] = data1[i][1]
+                    print(sql)
 
-            datastr = ""
-
-            for j in range(29):                                    
-                datastr = datastr + "'" + data1[i][j] + "'" + ","               
-            
-            for j in range(11):
-                datastr = datastr + "'" + data2[i][j] + "'" + ","
-
-            datastr = datastr + "'" + data3[i][0] + "'" + ","
-            datastr = datastr + "'" + data3[i][1] + "'" + ","
-
-            mydatetime = datetime.datetime.now().strftime("%y-%m-%d %H:%M")
-            datastr = datastr + "'" + mydatetime + "'"
-
-            datastr = "(" + datastr + ")"
-
-
-            sql = "INSERT INTO " + stock_table_name[i] + " (symbolName, marketType, price, changeValue, changePercent, open, marketCap, sharesOutstanding, publicFloat, beta, revPerEmployee, peRatio, eps, yield, dividend, exdividendDate, shortInterest, floatShorted, averageVolume, dayLow, dayHigh, weekLow52, weekHigh52, week1, month1, month3, ytd, year1, volume, PricetoBookRatio, QuickRatio, CurrentRatio, DERatio, ReturnonAssets, ReturnonEquity, ReturnonInvestedCapital, NetMargin, GrossMargin, OperatingMargin, PreTaxMargin, Recommendations, TargetPrice, GotTime) VALUES " + datastr
-
-            mycursor.execute(sql)
-            mydb.commit()
-
-            print('saved', prev_market_type[i], data1[i][1], i)
-
-            # else:
-            #     print('unsaved', prev_market_type[i], data1[i][1], i)
+                    mycursor.execute(sql)
+                    mydb.commit()
             
         mycursor.close()
         mydb.close()
-        print("StockData Saved Successfully!")
     except Exception as e: print(e)
 
 def getStockData():
-    rtArray =  list()
+    data =  [[], []]
 
-    for i in range(5):
-        geturl = tv_url+stockUrl[i]
+    for i in range(2):
+        temp_data =  list()
+
+        geturl = finance_url+stock_url[i]
 
         driver = webdriver.Chrome(executable_path = path_to_chromedriver, chrome_options=options)
+        
         driver.get(geturl)
+        
+        time.sleep(5)
 
-        while True:
-            try:
-                Create = driver.find_element_by_xpath("//ul[@class='tabs']/li[2]/a")
-                driver.execute_script("arguments[0].click()", Create)                
-                break
-            except TimeoutException :
-                print("Retrying...")
-                continue
+        for j in range(1000): 
+
+            t = str(10000*(j+1))
+            driver.execute_script("window.scrollTo(0, "+t+")")
         
         res = driver.execute_script("return document.documentElement.outerHTML")
         driver.quit()
 
         page_soup = soup(res, "lxml")
-        containers = page_soup.findAll("div", {"class":"stock"})[0]
-        status = containers.findAll("small", {"class":"intraday__status"})
+        containers = page_soup.findAll("tr", {"class":"Whs(nw)"})
+        # status = containers.findAll("small", {"class":"intraday__status"})
+        x = 0
+        for obj in containers:
+            val_obj = obj.findAll("td", {"class":"Py(10px)"})
+            x = x+1
+            # print(val_obj[0].text, val_obj[1].text, val_obj[2].text, val_obj[3].text, val_obj[4].text, val_obj[5].text)
+            # print(stockNames[i], val_obj)
+            Date = ""
+            Open = ""
+            High = ""
+            Low = ""
+            Close = ""
+            AdjClose = ""
+            Volume = ""
+            # if(len(val_obj) != 7):
+            #     temp_data.append(val_obj)
+            if(len(val_obj) == 2):
+                Date = val_obj[0].text
+                Open = val_obj[1].text
+                High = ""
+                Low = ""
+                Close = ""
+                AdjClose = ""
+                Volume = ""
+            else:
+                Date = val_obj[0].text
+                Open = val_obj[1].text
+                High = val_obj[2].text
+                Low = val_obj[3].text
+                Close = val_obj[4].text
+                AdjClose = val_obj[5].text
+                Volume = val_obj[6].text
 
-        text = status[0].text;
-
-        p=status[0].findAll("span",{"class":"company__ticker"})[0].text
-        text=text.replace(p,"")
-        p=status[0].findAll("span",{"class":"company__market"})[0].text
-        text=text.replace(p,"")
-        p=status[0].findAll("span",{"class":"scroll-top"})[0].text
-        text=text.replace(p,"")
-
-        marketType = text
-
-        pp = containers.findAll("bg-quote", {"class":"value"})
-        price = ""
-        changeValue = ""
-        changePercent = ""
-        if(pp == []):
-            pp = containers.findAll("span", {"class":"value"})
-            price = pp[0].text
-
-            pp = containers.findAll("span", {"class":"change--point--q"})
-            changeValue = pp[0].text
-
-            pp = containers.findAll("span", {"class":"change--percent--q"})
-            changePercent = pp[0].text
-        else:
-            price = pp[0].text
-
-            pp = containers.findAll("bg-quote", {"field":"change"})
-            changeValue = pp[0].text
-
-            pp = containers.findAll("bg-quote", {"field":"percentchange"})
-            changePercent = pp[0].text
-
-        pp = containers.findAll("td",{"class":"u-semi"})
-        preClose = pp[0].text
-
-        pp = containers.findAll("span", {"class":"last-value"})
-        volume = pp[0].text.strip()
-
-        pp = containers.findAll("mw-rangebar", {"class":"lowHigh--day"})[0]
-        qq = pp.findAll("span", {"class":"low"})
-        dayLow = qq[0].text
-
-        pp = containers.findAll("mw-rangebar", {"class":"lowHigh--day"})[0]
-        qq = pp.findAll("span", {"class":"high"})
-        dayHigh = qq[0].text
-
-        pp = containers.findAll("mw-rangebar", {"class":"lowHigh--year"})[0]
-        qq = pp.findAll("span", {"class":"low"})
-        weekLow52 = qq[0].text
-
-        pp = containers.findAll("mw-rangebar", {"class":"lowHigh--year"})[0]
-        qq = pp.findAll("span", {"class":"high"})
-        weekHigh52 = qq[0].text
-
-        pp = containers.findAll("li", {"class":"kv__item"})
-
-        qq = pp[0].findAll("span",{"class":"kv__primary"})
-        Open = qq[0].text
-
-        qq = pp[3].findAll("span",{"class":"kv__primary"})
-        marketCap = qq[0].text
-
-        qq = pp[4].findAll("span",{"class":"kv__primary"})
-        sharesOutstanding = qq[0].text
+            temp = [stockNames[i], Date, Open, High, Low, Close, AdjClose, Volume]
+            temp_data.append(temp)
         
-        qq = pp[5].findAll("span",{"class":"kv__primary"})
-        publicFloat = qq[0].text
+        data[i] = temp_data
+
+        time.sleep(3)
         
-        qq = pp[6].findAll("span",{"class":"kv__primary"})
-        beta = qq[0].text
-        
-        qq = pp[7].findAll("span",{"class":"kv__primary"})
-        revPerEmployee = qq[0].text
-        
-        qq = pp[8].findAll("span",{"class":"kv__primary"})
-        peRatio = qq[0].text
-        
-        qq = pp[9].findAll("span",{"class":"kv__primary"})
-        eps = qq[0].text
-        
-        qq = pp[10].findAll("span",{"class":"kv__primary"})
-        Yield = qq[0].text
-        
-        qq = pp[11].findAll("span",{"class":"kv__primary"})
-        dividend = qq[0].text
-        
-        qq = pp[12].findAll("span",{"class":"kv__primary"})
-        exDividendDate = qq[0].text
-        
-        qq = pp[13].findAll("span",{"class":"kv__primary"})
-        shortInterest = qq[0].text
-        
-        qq = pp[14].findAll("span",{"class":"kv__primary"})
-        floatShorted = qq[0].text
-        
-        qq = pp[15].findAll("span",{"class":"kv__primary"})
-        averageVolume = qq[0].text
-
-
-        #PERFORMANCE
-        pp = containers.findAll("li", {"class":"ignore-color"})
-        week1 = pp[0].text
-        month1 = pp[1].text
-        month3 = pp[2].text
-        ytd = pp[3].text
-        year1 = pp[4].text
-
-        realtimeData = [
-            stockNames[i],         
-            marketType,
-            price,
-            changeValue,
-            changePercent,
-            Open,
-            marketCap,
-            sharesOutstanding,
-            publicFloat,
-            beta,
-            revPerEmployee,
-            peRatio,
-            eps,
-            Yield,
-            dividend,
-            exDividendDate,
-            shortInterest,
-            floatShorted,
-            averageVolume,
-            dayLow,
-            dayHigh,
-            weekLow52,
-            weekHigh52,
-            week1,
-            month1,
-            month3,
-            ytd,
-            year1,
-            volume
-        ]
-
-        rtArray.append(realtimeData)
-
-        time.sleep(1)
-        
-    return rtArray
-
-def getStockData2():
-    rtArray = list()
-
-    for i in range(5):
-        try:
-            MarketCapitalization = ""
-
-            new_url = tradingview_url + stock_url[i]
-
-            driver = webdriver.Chrome(executable_path = path_to_chromedriver, chrome_options=options) #load chrome driver
-            driver.get(new_url)
-            res = driver.execute_script("return document.documentElement.outerHTML")
-            driver.quit()
-
-            page_soup = soup(res, "lxml")
-
-            containers = page_soup.findAll("div", {"class":"tv-feed-widget--fundamentals"})
-            all_value = containers[0].findAll("span", {"class":"tv-widget-fundamentals__value"})
-            
-            PricetoBookRatio = all_value[8].text.strip()
-            QuickRatio = all_value[14].text.strip()
-            CurrentRatio = all_value[15].text.strip()
-            DERatio = all_value[16].text.strip()
-            ReturnonAssets = all_value[24].text.strip()
-            ReturnonEquity = all_value[25].text.strip()
-            ReturnonInvestedCapital = all_value[26].text.strip()
-            NetMargin = all_value[28].text.strip()
-            GrossMargin = all_value[29].text.strip()
-            OperatingMargin = all_value[30].text.strip()
-            PreTaxMargin = all_value[31].text.strip()
-            
-            realtimeData = [
-                PricetoBookRatio,
-                QuickRatio,
-                CurrentRatio,
-                DERatio,
-                ReturnonAssets,
-                ReturnonEquity,
-                ReturnonInvestedCapital,
-                NetMargin,
-                GrossMargin,
-                OperatingMargin,
-                PreTaxMargin
-            ]
-            rtArray.append(realtimeData)
-            time.sleep(1)
-
-        except Exception as ex:
-            realtimeData = [
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                '',
-                ''
-            ]
-            rtArray.append(realtimeData)
-            time.sleep(1)
-            pass
-        # rtArray.append(realtimeData)
-    return rtArray
-
-def getStockData3():
-    rtArray = list()
-
-    for i in range(5):
-        driver = webdriver.Chrome(path_to_chromedriver, chrome_options=options)
-
-        url = tv_url + stockUrl[i] +"/analystestimates"
-        driver.get(url)
-
-        res = driver.execute_script("return document.documentElement.outerHTML")
-        driver.quit()
-
-        page_soup = soup(res, "lxml")
-
-        containers = page_soup.findAll("table", {"class":"snapshot"})
-
-        if(containers == []):
-            Recommendations = ""
-            TargetPrice = ''
-        else:
-            cont = containers[0].findAll("td")
-            Recommendations = cont[1].text.strip()
-            TargetPrice = cont[3].text.strip()
-
-        realtimeData = [
-            Recommendations,
-            TargetPrice
-        ]
-        rtArray.append(realtimeData)
-        time.sleep(1)
-
-    return rtArray
-
+    return data
 
 def main():
-    while 1:
-        start_time = time.time()
-        data1 = getStockData()
-        data2 = getStockData2()
-        data3 = getStockData3()
-        StockDataToSql(data1, data2, data3)
-        execute_time = time.time() - start_time
-        print("Stock Scrapping Time:", execute_time)
-        time.sleep(3600 - execute_time)
+    start_time = time.time()
+    data = getStockData()
+    StockDataToSql(data)
+    execute_time = time.time() - start_time
+    print("Stock Scrapping Time:", execute_time)
+
 main()
